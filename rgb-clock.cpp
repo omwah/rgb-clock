@@ -6,7 +6,7 @@
 #include "animation.h"
 
 SYSTEM_MODE(AUTOMATIC);
-Adafruit_NeoPixel *strip
+
 // IMPORTANT: Set pixel COUNT, PIN and TYPE
 #define PIXEL_PIN D2
 #define PIXEL_COUNT 60
@@ -19,41 +19,66 @@ Animation animation = Animation(&strip);
 
 // Define colors for time telling
 uint32_t off = strip.Color(0, 0, 0);
-uint32_t hour_color = strip.Color(255, 0, 0);
-uint32_t minute_color = strip.Color(0, 255, 0);
-uint32_t second_color = strip.Color(255, 0, 255);
+
+// Make hour and minute colors "breathe"
+Breathe hour_breath = Breathe(off, strip.Color(255, 0, 0), 43);
+Breathe minute_breath = Breathe(off, strip.Color(0, 255, 0), 4.3);
+Breathe second_breath = Breathe(off, strip.Color(0, 0, 255), 10);
 
 // Last indexes so we can turn off the old pixel
 int last_hour_idx = 0;
 int last_minute_idx = 0;
 int last_second_idx = 0;
 
-void setup() {
+// Signatures
+void display_clock();
+
+void setup()
+{
     Time.zone(TIME_ZONE);
     
     strip.begin();
-    strip.setBrightness(64);
+    //strip.setBrightness(64);
     strip.show(); // Initialize all pixels to 'off'
+
+    animation.rainbow_cycle(10);
 }
 
-void loop() {
+void loop()
+{
+    display_clock();
+}
+
+void display_clock()
+{
+    // Get the current time, broken out into parts
     int curr_hour_idx = Time.hourFormat12() * 5 % 60;
-    strip.setPixelColor(last_hour_idx, off);
-    strip.setPixelColor(curr_hour_idx, hour_color);
-    last_hour_idx = curr_hour_idx;
-
     int curr_minute_idx = Time.minute();
-    strip.setPixelColor(last_minute_idx, off);
-    strip.setPixelColor(curr_minute_idx, minute_color);
-    last_minute_idx = curr_minute_idx;
-
     int curr_second_idx = Time.second();
-    strip.setPixelColor(last_second_idx, off);
-    strip.setPixelColor(curr_second_idx, second_color);
-    last_second_idx = curr_second_idx;
-    
+
+    // Produce a little animation when minutes advance
+    if (curr_minute_idx != last_minute_idx && curr_minute_idx == 0) {
+        animation.rainbow_cycle(10);
+    } else if (curr_second_idx != last_second_idx && curr_second_idx == 0) {
+        strip.setPixelColor(last_second_idx, off);
+        animation.rainbow_wipe(curr_minute_idx, 20);
+        delay(20);
+        animation.set_all(off);
+    }
+
+    // Clear the display
+    animation.set_all(off);
+
+    // Set hand colors
+    strip.setPixelColor(curr_minute_idx, minute_breath.color());
+    strip.setPixelColor(curr_hour_idx, hour_breath.color());
+    strip.setPixelColor(curr_second_idx, second_breath.color());
+
     strip.show();
+
+    // Update indexes
+    last_minute_idx = curr_minute_idx;
+    last_hour_idx = curr_hour_idx;
+    last_second_idx = curr_second_idx;
+ 
 }
-
-
-
